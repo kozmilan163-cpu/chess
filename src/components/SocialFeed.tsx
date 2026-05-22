@@ -218,6 +218,7 @@ export function SocialFeed() {
             {filteredPosts.map(post => (
               <SocialPostItem
                 key={post.id}
+                key={post.id}
                 post={post}
                 likedPosts={likedPosts}
                 savedPosts={savedPosts}
