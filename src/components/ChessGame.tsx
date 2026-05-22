@@ -1069,3 +1069,68 @@ export function ChessGame({ initialWhiteTime, whiteIncrement, initialBlackTime, 
       </div>
   );
 }
+
+      {isGameOver && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-6 border border-slate-200 animate-in fade-in zoom-in-95 duration-300">
+            {/* Game Over Header */}
+            <div className="text-center">
+              <h2 className="text-3xl font-black text-slate-900 mb-2">
+                {gameOverMessage.includes("Checkmate") ? "♔ Checkmate!" : gameOverMessage.includes("wins") ? "🏆 Winner!" : "🤝 Game Over"}
+              </h2>
+              <p className="text-slate-600 font-medium">{gameOverMessage}</p>
+            </div>
+
+            {/* Share Section */}
+            <div className="space-y-3 pt-4 border-t border-slate-200">
+              <label className="block">
+                <p className="text-sm font-semibold text-slate-900 mb-2">Share to Feed</p>
+                <textarea
+                  value={shareComment}
+                  onChange={(e) => setShareComment(e.target.value)}
+                  placeholder="Add a caption... (optional)"
+                  maxLength={200}
+                  className="w-full bg-slate-100 border-0 rounded-lg px-4 py-3 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                  rows={3}
+                />
+                <p className="text-xs text-slate-500 mt-1">{shareComment.length}/200</p>
+              </label>
+              <button
+                onClick={() => {
+                  shareGame("game");
+                  setTimeout(() => {
+                    setShareComment("");
+                  }, 500);
+                }}
+                disabled={isSharing}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                <Share2 size={18} />
+                {isSharing ? "Sharing..." : "Share Game"}
+              </button>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={resetGame}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 py-2.5 rounded-lg font-semibold transition-colors"
+              >
+                Rematch
+              </button>
+              <button
+                onClick={onBack}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 py-2.5 rounded-lg font-semibold transition-colors"
+              >
+                Back
+              </button>
+            </div>
+
+            {shareSuccess && (
+              <div className="bg-green-100 border border-green-300 text-green-800 px-4 py-3 rounded-lg text-sm font-medium text-center">
+                ✓ Game shared to feed!
+              </div>
+            )}
+          </div>
+        </div>
+      )}
