@@ -1,0 +1,10 @@
+{
+  "name": "Social Chess",
+  "description": "Premium 1v1 Chess experience with AI Theme Generator, Arena Tournaments, and a Social Feed to share your best games.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
