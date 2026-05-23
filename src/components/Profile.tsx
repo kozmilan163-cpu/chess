@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  User, RefreshCw, Award, CheckCircle, History, ExternalLink, 
+import {
+  User, RefreshCw, Award, CheckCircle, History, ExternalLink,
   Brain, Sparkles, TrendingUp, AlertTriangle, Shield, Coins,
   Calendar, RotateCcw, Play, X, Zap, Target, Upload, Users, UserPlus
 } from 'lucide-react';
@@ -13,7 +13,7 @@ export interface GeneratedTheme {
   light: string;
   dark: string;
   border?: string;
-  pieces?: Record<string, { name: string, url: string, shapeUrl?: string, textureUrl?: string, color?: string }>;
+  pieces?: Record<string, { name: string; url: string; shapeUrl?: string; textureUrl?: string; color?: string }>;
   customBoardImage?: string;
   date?: string;
 }
@@ -29,26 +29,27 @@ export interface UserProfile {
   activeBoardTheme?: string;
   customBoardImage?: string;
   customThemes?: GeneratedTheme[];
-  avatar?: string; // base64 avatar
+  avatar?: string;
   followers?: number;
   following?: number;
-  history?: Array<{ 
-    id: string; 
-    pgn: string; 
-    result: string; 
-    opponent: string; 
+  history?: Array<{
+    id: string;
+    opponent: string;
+    result: 'win' | 'loss' | 'draw';
+    pgn: string;
     date: string;
-    white?: string;
-    black?: string;
-    movesCount?: number;
-    fen?: string;
+    ratingChange: number;
   }>;
+  friendRequests?: { incoming: string[]; outgoing: string[] };
+  friends?: string[];
 }
 
 interface ProfileProps {
   profile: UserProfile | null;
   onUpdateProfile: (profile: UserProfile) => void;
 }
+
+type ProfileTab = 'stats' | 'history' | 'themes' | 'social' | 'settings';
 
 export function Profile({ profile, onUpdateProfile }: ProfileProps) {
   const [username, setUsername] = useState(profile?.username || '');
@@ -59,331 +60,391 @@ export function Profile({ profile, onUpdateProfile }: ProfileProps) {
   const [showVerification, setShowVerification] = useState(false);
   const [showAvatarUpload, setShowAvatarUpload] = useState(false);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ProfileTab>('stats');
+  const [friendFilter, setFriendFilter] = useState<'all' | 'online' | 'requests'>('all');
 
-  const followers = profile?.followers || 0;
-  const following = profile?.following || 0;
-  const history = profile?.history || [];
-  const totalGames = history.length;
-  const wins = history.filter(g => g.result?.toLowerCase().includes('white') || g.result?.toLowerCase().includes('win')).length;
-  const losses = totalGames - wins;
-  const draws = history.filter(g => g.result?.toLowerCase().includes('draw')).length;
-  const winRate = totalGames > 0 ? ((wins / totalGames) * 100).toFixed(1) : '0.0';
+  useEffect(() => {
+    if (profile) {
+      setUsername(profile.username);
+      setChessComUsername(profile.chessComUsername || '');
+    }
+  }, [profile]);
 
-  // Analyze game
-  const analyzeGame = (gameId: string) => {
-    setSelectedGameId(gameId);
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  const winRate = profile.history
+    ? Math.round((profile.history.filter(h => h.result === 'win').length / profile.history.length) * 100)
+    : 0;
+
+  const totalGames = profile.history?.length || 0;
+  const wins = profile.history?.filter(h => h.result === 'win').length || 0;
+  const losses = profile.history?.filter(h => h.result === 'loss').length || 0;
+  const draws = profile.history?.filter(h => h.result === 'draw').length || 0;
+
+  const handleSave = () => {
+    setLoading(true);
+    setError('');
+    setTimeout(() => {
+      onUpdateProfile({ ...profile, username, chessComUsername });
+      setLoading(false);
+    }, 500);
   };
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      onUpdateProfile({
-        ...profile!,
-        avatar: base64
-      });
+    reader.onload = () => {
+      onUpdateProfile({ ...profile, avatar: reader.result as string });
       setShowAvatarUpload(false);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSaveBasic = () => {
-    if (!username) return;
-    onUpdateProfile({
-      ...profile!,
-      username,
-      localRating: profile?.localRating || 1200,
-      chessComUsername: profile?.chessComUsername,
-      chessComRating: profile?.chessComRating,
-      isVerified: profile?.isVerified,
-    });
-  };
-
-  const verifyAndLink = async () => {
-    if (!chessComUsername) return;
+  const handleVerifyChessCom = async () => {
     setLoading(true);
     setError('');
-    
     try {
-      const profileResponse = await fetch(`https://api.chess.com/pub/player/${chessComUsername}`);
-      if (!profileResponse.ok) {
-        throw new Error('User not found on Chess.com');
-      }
-      
-      const profileData = profileResponse.json();
-      const location = (await profileData).location || '';
-      const about = (await profileData).about || '';
-      const isVerified = location.includes(verificationCode) || about.includes(verificationCode);
-      
-      if (!isVerified) {
-        throw new Error(`Could not find "${verificationCode}" in your Chess.com 'Location' or 'About me' section.`);
-      }
-
-      const statsResponse = await fetch(`https://api.chess.com/pub/player/${chessComUsername}/stats`);
-      if (!statsResponse.ok) {
-        throw new Error('Could not fetch user stats.');
-      }
-      const data = await statsResponse.json();
-      
-      let rating = data?.chess_rapid?.last?.rating || data?.chess_blitz?.last?.rating || 1200;
-
+      const res = await fetch(`https://api.chess.com/pub/player/${chessComUsername}`);
+      if (!res.ok) throw new Error('User not found');
+      const data = await res.json();
+      const statsRes = await fetch(`https://api.chess.com/pub/player/${chessComUsername}/stats`);
+      const statsData = await statsRes.json();
+      const rapid = statsData.chess_rapid?.last?.rating || 0;
       onUpdateProfile({
-        ...profile!,
-        username: profile?.username || username || 'Anonymous',
-        localRating: rating,
-        chessComUsername: chessComUsername,
-        chessComRating: rating,
+        ...profile,
+        chessComUsername,
+        chessComRating: rapid,
         isVerified: true,
       });
-
       setShowVerification(false);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
+    } catch {
+      setError('Could not verify Chess.com account. Please check the username.');
     }
+    setLoading(false);
   };
 
-  const startVerification = () => {
-    if (!chessComUsername) return;
-    setShowVerification(true);
-  };
-
-  // Get display FEN for game history
-  const getGameFen = (game: any) => {
-    return game.fen || 'start';
-  };
-
-  // Get result badge color
-  const getResultColor = (result: string) => {
-    if (result?.toLowerCase().includes('win')) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    if (result?.toLowerCase().includes('loss')) return 'bg-rose-50 text-rose-700 border-rose-200';
-    if (result?.toLowerCase().includes('draw')) return 'bg-amber-50 text-amber-700 border-amber-200';
-    return 'bg-slate-50 text-slate-700 border-slate-200';
-  };
-
-  const getResultText = (result: string) => {
-    if (result?.toLowerCase().includes('win')) return '🏆 Win';
-    if (result?.toLowerCase().includes('loss')) return '❌ Loss';
-    if (result?.toLowerCase().includes('draw')) return '🤝 Draw';
-    return result;
-  };
+  const tabs: { key: ProfileTab; label: string; icon: any }[] = [
+    { key: 'stats', label: 'Stats', icon: TrendingUp },
+    { key: 'history', label: 'History', icon: History },
+    { key: 'themes', label: 'Themes', icon: Sparkles },
+    { key: 'social', label: 'Social', icon: Users },
+    { key: 'settings', label: 'Settings', icon: Shield },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white py-6 px-4 md:px-8">
-      <div className="w-full max-w-4xl mx-auto space-y-8">
-        
-        {/* Profile Header Card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-          {/* Cover area */}
-          <div className="h-32 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600" />
-          
-          {/* Profile Content */}
-          <div className="px-6 pb-6 pt-0">
-            <div className="flex flex-col md:flex-row gap-6 -mt-16">
-              {/* Avatar */}
-              <div className="flex flex-col items-center md:items-start">
-                <div className="relative">
+    <div className="max-w-2xl mx-auto pb-24 md:pb-0">
+      {/* Profile Header Card */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+        <div className="flex items-start gap-4">
+          {/* Avatar */}
+          <div className="relative">
+            {profile.avatar ? (
+              <img src={profile.avatar} alt="Avatar" className="w-20 h-20 rounded-full object-cover ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-800" />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-800">
+                {profile.username.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <button
+              onClick={() => setShowAvatarUpload(!showAvatarUpload)}
+              className="absolute -bottom-1 -right-1 p-1.5 bg-white dark:bg-slate-700 rounded-full shadow-sm border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+            >
+              <Upload size={14} className="text-slate-600 dark:text-slate-300" />
+            </button>
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">{profile.username}</h2>
+              {profile.isVerified && <CheckCircle size={18} className="text-blue-500 fill-blue-500" />}
+            </div>
+
+            <div className="flex items-center gap-4 mt-2 text-sm">
+              <div className="text-center">
+                <p className="font-bold text-slate-900 dark:text-white">{totalGames}</p>
+                <p className="text-slate-500 dark:text-slate-400 text-xs">Games</p>
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-slate-900 dark:text-white">{profile.localRating}</p>
+                <p className="text-slate-500 dark:text-slate-400 text-xs">Rating</p>
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-slate-900 dark:text-white">{profile.followers || 0}</p>
+                <p className="text-slate-500 dark:text-slate-400 text-xs">Followers</p>
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-slate-900 dark:text-white">{profile.following || 0}</p>
+                <p className="text-slate-500 dark:text-slate-400 text-xs">Following</p>
+              </div>
+            </div>
+
+            {profile.chessComUsername && (
+              <a
+                href={`https://chess.com/member/${profile.chessComUsername}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 mt-2 text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-500 transition-colors"
+              >
+                <ExternalLink size={14} />
+                chess.com/{profile.chessComUsername}
+                {profile.chessComRating && <span className="text-xs bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{profile.chessComRating} Elo</span>}
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Avatar Upload */}
+        {showAvatarUpload && (
+          <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700">
+            <label className="flex flex-col items-center gap-2 cursor-pointer py-4">
+              <Upload size={24} className="text-slate-400" />
+              <span className="text-sm text-slate-600 dark:text-slate-400">Click to upload avatar</span>
+              <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+            </label>
+          </div>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="mt-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+        <div className="flex border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === tab.key
+                  ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              <tab.icon size={16} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-4">
+          {/* Stats Tab */}
+          {activeTab === 'stats' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{wins}</p>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-500 font-medium">Wins</p>
+                </div>
+                <div className="bg-rose-50 dark:bg-rose-900/20 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">{losses}</p>
+                  <p className="text-xs text-rose-700 dark:text-rose-500 font-medium">Losses</p>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{draws}</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-500 font-medium">Draws</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-700/30 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Win Rate</span>
+                  <span className="text-sm font-bold text-slate-900 dark:text-white">{winRate}%</span>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2.5">
+                  <div
+                    className="bg-indigo-500 h-2.5 rounded-full transition-all duration-500"
+                    style={{ width: `${winRate}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-4">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Coins</p>
+                  <p className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                    <Coins size={16} className="text-amber-500" />
+                    {(profile.coins || 0).toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-4">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Best Rating</p>
+                  <p className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                    <TrendingUp size={16} className="text-emerald-500" />
+                    {Math.max(profile.localRating, profile.chessComRating || 0)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* History Tab */}
+          {activeTab === 'history' && (
+            <div className="space-y-2">
+              {(!profile.history || profile.history.length === 0) ? (
+                <div className="text-center py-8">
+                  <History size={32} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">No games played yet</p>
+                </div>
+              ) : (
+                profile.history.map(game => (
                   <button
-                    onClick={() => setShowAvatarUpload(!showAvatarUpload)}
-                    className="w-32 h-32 rounded-2xl border-4 border-white shadow-xl flex items-center justify-center font-bold text-white text-3xl overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-600 hover:shadow-2xl transition-shadow cursor-pointer"
+                    key={game.id}
+                    onClick={() => setSelectedGameId(selectedGameId === game.id ? null : game.id)}
+                    className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left"
                   >
-                    {profile?.avatar ? (
-                      <img src={profile.avatar} alt={username} className="w-full h-full object-cover" />
-                    ) : (
-                      <User size={56} />
-                    )}
-                  </button>
-                  <div className="absolute bottom-0 right-0 bg-blue-600 p-2 rounded-lg text-white shadow-lg cursor-pointer hover:bg-blue-700 transition-colors">
-                    <Upload size={16} />
-                  </div>
-                </div>
-
-                {showAvatarUpload && (
-                  <div className="mt-3">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarUpload}
-                      className="text-sm"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Info */}
-              <div className="flex-1">
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-3xl font-extrabold text-slate-900">@{username || 'Player'}</h1>
-                    {profile?.isVerified && <CheckCircle size={24} className="text-blue-600" />}
-                  </div>
-                  <p className="text-slate-500">Chess.com: {chessComUsername || 'Not linked'}</p>
-                </div>
-
-                {/* Follow Stats */}
-                <div className="flex gap-6 mb-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-slate-900">{followers}</div>
-                    <div className="text-xs text-slate-500 font-medium">Followers</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-slate-900">{following}</div>
-                    <div className="text-xs text-slate-500 font-medium">Following</div>
-                  </div>
-                  <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                    <UserPlus size={16} /> Follow
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow text-center hover:shadow-md transition-shadow">
-            <div className="flex justify-center mb-2">
-              <Award className="text-blue-600" size={24} />
-            </div>
-            <div className="text-2xl font-bold text-slate-900">{profile?.localRating || 1200}</div>
-            <div className="text-xs text-slate-500 font-medium mt-1">Rating</div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow text-center hover:shadow-md transition-shadow">
-            <div className="flex justify-center mb-2">
-              <Play className="text-indigo-600" size={24} />
-            </div>
-            <div className="text-2xl font-bold text-slate-900">{totalGames}</div>
-            <div className="text-xs text-slate-500 font-medium mt-1">Games</div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow text-center hover:shadow-md transition-shadow">
-            <div className="flex justify-center mb-2">
-              <TrendingUp className="text-emerald-600" size={24} />
-            </div>
-            <div className="text-2xl font-bold text-slate-900">{wins}</div>
-            <div className="text-xs text-slate-500 font-medium mt-1">Wins</div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow text-center hover:shadow-md transition-shadow">
-            <div className="flex justify-center mb-2">
-              <Zap className="text-amber-600" size={24} />
-            </div>
-            <div className="text-2xl font-bold text-slate-900">{winRate}%</div>
-            <div className="text-xs text-slate-500 font-medium mt-1">Win Rate</div>
-          </div>
-        </div>
-
-        {/* Edit Profile Section */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-4">
-          <h2 className="text-xl font-bold text-slate-900">Edit Profile</h2>
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm font-medium text-slate-700 block mb-1">Username</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-            </div>
-            <button
-              onClick={handleSaveBasic}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            >
-              Save Changes
-            </button>
-          </div>
-
-          <div className="border-t border-slate-200 pt-4 space-y-3">
-            <h3 className="font-medium text-slate-900">Link Chess.com Account</h3>
-            <div>
-              <label className="text-sm font-medium text-slate-700 block mb-1">Chess.com Username</label>
-              <input
-                type="text"
-                value={chessComUsername}
-                onChange={(e) => setChessComUsername(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-            </div>
-            <button
-              onClick={startVerification}
-              className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium"
-            >
-              Link Account
-            </button>
-          </div>
-        </div>
-
-        {/* Game History */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-          <h2 className="text-xl font-bold text-slate-900 mb-4">Game History</h2>
-          
-          {history.length === 0 ? (
-            <div className="text-center py-12 text-slate-500">
-              <p>No games yet. Start playing!</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {history.slice().reverse().map(game => (
-                <div
-                  key={game.id}
-                  onClick={() => analyzeGame(game.id)}
-                  className="border border-slate-200 rounded-xl overflow-hidden hover:shadow-lg transition-all cursor-pointer bg-slate-50"
-                >
-                  {/* Board */}
-                  <div className="bg-slate-900 p-2">
-                    <div className="rounded-lg overflow-hidden max-w-[200px] mx-auto">
-                      <Chessboard
-                        position={getGameFen(game)}
-                        arePiecesDraggable={false}
-                        showBoardNotation={false}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Game Info */}
-                  <div className="p-4 space-y-2">
-                    <div className={`inline-block px-3 py-1 rounded-full text-sm font-bold border ${getResultColor(game.result)}`}>
-                      {getResultText(game.result)}
-                    </div>
-                    <div className="text-sm text-slate-700">
-                      <span className="font-medium">vs </span>
-                      <span>{game.opponent}</span>
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {new Date(game.date).toLocaleDateString()}
-                    </div>
-                    {game.movesCount && (
-                      <div className="text-xs text-slate-500">
-                        {game.movesCount} moves
+                    <div className="flex items-center gap-3">
+                      <span className={`w-2 h-2 rounded-full ${
+                        game.result === 'win' ? 'bg-emerald-500' : game.result === 'loss' ? 'bg-rose-500' : 'bg-amber-500'
+                      }`} />
+                      <div>
+                        <p className="text-sm font-medium text-slate-900 dark:text-white">vs {game.opponent}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{new Date(game.date).toLocaleDateString()}</p>
                       </div>
-                    )}
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-sm font-bold ${
+                        game.ratingChange > 0 ? 'text-emerald-600 dark:text-emerald-400' : game.ratingChange < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'
+                      }`}>
+                        {game.ratingChange > 0 ? '+' : ''}{game.ratingChange}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
+
+              {selectedGameId && (
+                <div className="mt-2 p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Game Analysis</h3>
+                    <button onClick={() => setSelectedGameId(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full">
+                      <X size={16} className="text-slate-500" />
+                    </button>
                   </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Game analysis coming soon with Stockfish integration.</p>
                 </div>
-              ))}
+              )}
+            </div>
+          )}
+
+          {/* Themes Tab */}
+          {activeTab === 'themes' && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Active Theme</h3>
+              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900 dark:to-orange-900 border border-slate-200 dark:border-slate-600" />
+                <div>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">{profile.activeBoardTheme || 'Default'}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{profile.inventory?.length || 0} themes owned</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Social Tab */}
+          {activeTab === 'social' && (
+            <div className="space-y-4">
+              {/* Friend Filters */}
+              <div className="flex gap-2">
+                {(['all', 'online', 'requests'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFriendFilter(f)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      friendFilter === f
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    {f === 'all' && <Users size={12} className="inline mr-1" />}
+                    {f === 'online' && <Zap size={12} className="inline mr-1" />}
+                    {f === 'requests' && <UserPlus size={12} className="inline mr-1" />}
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                    {f === 'requests' && (profile.friendRequests?.incoming.length || 0) > 0 && (
+                      <span className="ml-1 bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                        {profile.friendRequests?.incoming.length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="text-center py-8">
+                <Users size={32} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">Friend system coming in the next update</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Play games and add opponents to build your friend list</p>
+              </div>
+            </div>
+          )}
+
+          {/* Settings Tab */}
+          {activeTab === 'settings' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Display Name</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Chess.com Username</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={chessComUsername}
+                    onChange={e => setChessComUsername(e.target.value)}
+                    placeholder="e.g. magnuscarlsen"
+                    className="flex-1 px-3 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button
+                    onClick={() => setShowVerification(!showVerification)}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors"
+                  >
+                    Verify
+                  </button>
+                </div>
+              </div>
+
+              {showVerification && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-blue-800 dark:text-blue-300">
+                    To verify, add this code to your Chess.com profile: <code className="font-mono bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded">{verificationCode}</code>
+                  </p>
+                  <button
+                    onClick={handleVerifyChessCom}
+                    disabled={loading}
+                    className="mt-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {loading ? 'Checking...' : 'I\'ve added it'}
+                  </button>
+                </div>
+              )}
+
+              {error && (
+                <div className="p-3 bg-rose-50 dark:bg-rose-900/20 rounded-xl border border-rose-200 dark:border-rose-800 flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-rose-500" />
+                  <p className="text-sm text-rose-700 dark:text-rose-400">{error}</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleSave}
+                disabled={loading}
+                className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
             </div>
           )}
         </div>
-
-        {/* Analysis Modal */}
-        {selectedGameId && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-slate-900">Game Analysis</h3>
-                <button onClick={() => setSelectedGameId(null)} className="text-slate-500 hover:text-slate-700">
-                  <X size={24} />
-                </button>
-              </div>
-              <p className="text-slate-600">Game analysis coming soon with Stockfish integration.</p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
