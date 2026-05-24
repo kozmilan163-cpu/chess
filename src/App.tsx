@@ -10,7 +10,7 @@ import { Puzzles } from './components/Puzzles';
 import { AnalysisBoard } from './components/AnalysisBoard';
 import { Shop } from './components/Shop';
 import { StudioWorkspace } from './components/StudioWorkspace';
-import { TournamentArena } from './components/TournamentArena';
+import { TournamentManager } from './components/TournamentManager';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'play' | 'social' | 'profile' | 'shop' | 'studio' | 'puzzles' | 'analysis'>('play');
@@ -254,11 +254,10 @@ export default function App() {
       <main className="flex-1 overflow-y-auto pb-20 md:pb-0 h-full">
         {activeTab === 'play' && (
           activeTournamentId ? (
-            <TournamentArena 
+            <TournamentManager 
               tournamentId={activeTournamentId}
-              tournaments={tournaments}
+              tournament={tournaments.find(t => t.id === activeTournamentId) || { id: '', name: '', format: '', maxPlayers: 0, minRating: 0, maxRating: 0, isPrivate: false, host: '' }}
               profile={profile}
-              onUpdateProfile={handleUpdateProfile}
               onLeave={() => setActiveTournamentId(null)}
             />
           ) : isMatchmaking ? (
