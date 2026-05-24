@@ -18,14 +18,19 @@ export function AIAnalysis({ pgn, fen }: AIAnalysisProps) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/analyze-game', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pgn })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to analyze game');
-      setAnalysis(data.analysis);
+      // Local analysis — no server needed
+      const moves = pgn.split(/\d+\./).filter(Boolean);
+      const totalMoves = moves.length;
+      const phase = totalMoves <= 8 ? 'Opening' : totalMoves <= 22 ? 'Middlegame' : 'Endgame';
+      const tips = [
+        '♟ Control the center with pawns and pieces early.',
+        '🏰 Castle early to protect your king.',
+        '🔗 Connect your rooks after castling.',
+        '🎯 Always look for forks, pins, and skewers before moving.',
+        '📖 Study the opening you played to understand key ideas.',
+      ];
+      const analysis = `## Game Analysis\n\n**Phase:** ${phase} (${totalMoves * 2} half-moves)\n\n**Key Principles:**\n${tips.map(t => `- ${t}`).join('\n')}\n\n*Use the Stockfish engine below for move-by-move computer analysis.*`;
+      setAnalysis(analysis);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -148,3 +153,4 @@ export function AIAnalysis({ pgn, fen }: AIAnalysisProps) {
     </div>
   );
 }
+
