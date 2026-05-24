@@ -118,14 +118,16 @@ export function SocialFeed() {
 
   const fetchPosts = useCallback(async (pageNum: number) => {
     try {
-      const res = await fetch(`/api/social/feed?page=${pageNum}&filter=${filter}`);
-      const data = await res.json();
-      if (pageNum === 1) {
-        setPosts(data.posts || []);
-      } else {
-        setPosts(prev => [...prev, ...(data.posts || [])]);
-      }
-      setHasMore((data.posts || []).length >= 10);
+      // Load from localStorage (static build)
+      const stored = JSON.parse(localStorage.getItem("chess_social_feed") || "[]");
+      const perPage = 10;
+      const start = (pageNum - 1) * perPage;
+      const slice = stored.slice(start, start + perPage);
+      if (pageNum === 1) setPosts(slice.length ? slice : []);
+      else setPosts(prev => [...prev, ...slice]);
+      setHasMore(slice.length >= perPage);
+      if (slice.length === 0 && pageNum === 1) throw new Error("no posts");
+      setLoading(false); return;
     } catch {
       const demoPosts: Post[] = Array.from({ length: 5 }, (_, i) => ({
         id: `demo-${pageNum}-${i}`,
@@ -500,3 +502,4 @@ function SocialPostItem({ post, likedPosts, savedPosts, handleLike, handleSave, 
     </div>
   );
 }
+
