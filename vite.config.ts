@@ -12,12 +12,6 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    rollupOptions: {
-      external: ["socket.io-client"],
-      output: {
-        globals: { "socket.io-client": "io" }
-      }
-    }
   },
   server: {
     hmr: process.env.DISABLE_HMR !== "true",
