@@ -55,16 +55,17 @@ export function AnalysisBoard({ profile }: { profile?: any }) {
 
   const sharePosition = async () => {
     try {
-      await fetch('/api/social/post', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({
-           pgn: game.pgn(),
-           fen: shareSpecificMove ? game.fen() : undefined,
-           author: currentUsername,
-           comment: `Check out this interesting position I'm analyzing! (Move ${currentIdx + 1})`
-         })
+      // Save to localStorage feed (static build)
+      const existingFeed = JSON.parse(localStorage.getItem("chess_social_feed") || "[]");
+      existingFeed.unshift({
+        id: Math.random().toString(36).substring(7),
+        pgn: game.pgn(),
+        fen: shareSpecificMove ? game.fen() : undefined,
+        author: currentUsername,
+        comment: `Check out this interesting position I'm analyzing! (Move ${currentIdx + 1})`,
+        likes: 0, timestamp: Date.now(), comments: []
       });
+      localStorage.setItem("chess_social_feed", JSON.stringify(existingFeed.slice(0, 100)));
       setShareSuccess(true);
       setTimeout(() => setShareSuccess(false), 2000);
     } catch(e) {}
@@ -242,3 +243,4 @@ export function AnalysisBoard({ profile }: { profile?: any }) {
     </div>
   );
 }
+
