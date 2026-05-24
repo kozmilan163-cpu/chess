@@ -3,7 +3,7 @@ import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { Timer } from './Timer';
 import { ArrowLeft, RotateCcw, Link2, Copy, Check, Users, Share2, Zap, Maximize, Sparkles, Volume2, VolumeX, ChevronLeft, ChevronRight, Keyboard } from 'lucide-react';
-import io, { Socket } from 'socket.io-client';
+// socket.io removed — static build
 import { QRCodeSVG } from 'qrcode.react';
 import { UserProfile } from './Profile';
 import { playChessSound } from '../audio';
@@ -93,8 +93,8 @@ export function ChessGame({ whiteTime: initialWhiteTime, whiteInc, blackTime: in
   const [gameStarted, setGameStarted] = useState(!isMultiplayer);
   const [opponentConnected, setOpponentConnected] = useState(false);
   const [opponentName, setOpponentName] = useState<string>('Opponent');
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const [socket, setSocket] = useState<any>(null);
+  const socketRef = useRef<any>(null);
   const [lastMovePositions, setLastMovePositions] = useState<string[]>([]);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [showCopied, setShowCopied] = useState(false);
@@ -119,7 +119,9 @@ export function ChessGame({ whiteTime: initialWhiteTime, whiteInc, blackTime: in
   useEffect(() => {
     if (!isMultiplayer || !roomId) return;
 
-    const newSocket = io();
+    // Multiplayer requires a WebSocket server — disabled in static build
+    return;
+    const newSocket = { emit: () => {}, on: () => {}, disconnect: () => {} } as any;
     socketRef.current = newSocket;
     setSocket(newSocket);
 
@@ -337,23 +339,24 @@ export function ChessGame({ whiteTime: initialWhiteTime, whiteInc, blackTime: in
   const shareGame = async (type: 'position' | 'game' = 'game') => {
     setIsSharing(true);
     try {
-      const response = await fetch('/api/social/post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pgn: type === 'game' ? game.pgn() : game.fen(),
-          fen: game.fen(),
-          author: profile?.username || 'Anonymous',
-          authorId: profile?.username || 'anonymous',
-          comment: shareComment || (type === 'position' ? `What do you think of this position?` : `A nice game of chess. ${gameOverMessage}`),
-          result: gameOverMessage.includes('White wins') ? 'win' : gameOverMessage.includes('Black wins') ? 'loss' : 'draw',
-          tags: ['game']
-        })
-      });
-      if (response.ok) {
-        setShareSuccess(true);
-        setTimeout(() => setShareSuccess(false), 3000);
-      }
+      // Save to localStorage feed (static build)
+      const existingFeed = JSON.parse(localStorage.getItem('chess_social_feed') || '[]');
+      const newPost = {
+        id: Math.random().toString(36).substring(7),
+        pgn: type === 'game' ? game.pgn() : game.fen(),
+        fen: game.fen(),
+        author: profile?.username || 'Anonymous',
+        comment: shareComment || (type === 'position' ? 'What do you think of this position?' : `A nice game of chess. ${gameOverMessage}`),
+        result: gameOverMessage.includes('White wins') ? 'win' : gameOverMessage.includes('Black wins') ? 'loss' : 'draw',
+        tags: ['game'],
+        likes: 0,
+        timestamp: Date.now(),
+        comments: []
+      };
+      existingFeed.unshift(newPost);
+      localStorage.setItem('chess_social_feed', JSON.stringify(existingFeed.slice(0, 100)));
+      setShareSuccess(true);
+      setTimeout(() => setShareSuccess(false), 3000);
     } catch (e) {
       console.error('Failed to share game:', e);
     }
@@ -492,11 +495,10 @@ export function ChessGame({ whiteTime: initialWhiteTime, whiteInc, blackTime: in
 
   const handleAddFriend = async (userId: string) => {
     try {
-      await fetch('/api/friends/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fromId: profile?.username || 'anonymous', toId: userId })
-      });
+      // Save friend request to localStorage (static build)
+      const reqs = JSON.parse(localStorage.getItem('chess_friend_requests') || '[]');
+      reqs.push({ from: profile?.username || 'anonymous', to: userId, timestamp: Date.now() });
+      localStorage.setItem('chess_friend_requests', JSON.stringify(reqs));
     } catch (e) {
       console.error('Failed to send friend request:', e);
     }
@@ -755,3 +757,4 @@ export function ChessGame({ whiteTime: initialWhiteTime, whiteInc, blackTime: in
     </div>
   );
 }
+
