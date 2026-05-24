@@ -4,13 +4,21 @@ import { ChessGame } from './components/ChessGame';
 import { Profile, UserProfile } from './components/Profile';
 import { SocialFeed } from './components/SocialFeed';
 import { nanoid } from 'nanoid';
-import { User, Share2, Play, Search, X, ShoppingCart, Palette, Puzzle, LineChart, Bell } from 'lucide-react';
-import io, { Socket } from 'socket.io-client';
+import { User, Share2, Play, Search, X, ShoppingCart, Palette, Puzzle, LineChart } from 'lucide-react';
 import { Puzzles } from './components/Puzzles';
 import { AnalysisBoard } from './components/AnalysisBoard';
 import { Shop } from './components/Shop';
 import { StudioWorkspace } from './components/StudioWorkspace';
 import { TournamentManager } from './components/TournamentManager';
+
+// Socket.io is optional — only used when a real server is available
+let io: any = null;
+try {
+  // @ts-ignore
+  io = (await import('socket.io-client')).default;
+} catch {
+  // running as static build — multiplayer disabled
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'play' | 'social' | 'profile' | 'shop' | 'studio' | 'puzzles' | 'analysis'>('play');
@@ -19,7 +27,7 @@ export default function App() {
   const [isMultiplayer, setIsMultiplayer] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [isMatchmaking, setIsMatchmaking] = useState(false);
-  const [matchmakingSocket, setMatchmakingSocket] = useState<Socket | null>(null);
+  const [matchmakingSocket, setMatchmakingSocket] = useState<any>(null);
   
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isHost, setIsHost] = useState(false);
@@ -44,7 +52,6 @@ export default function App() {
       setProfile({ username: 'Player', localRating: 1200, coins: 1000000, inventory: ['default'], activeBoardTheme: 'default' });
     }
 
-    // Check for new social notifications
     const savedNotifs = localStorage.getItem('chess_social_notifs') || '0';
     setSocialNotifications(parseInt(savedNotifs));
   }, []);
@@ -64,36 +71,31 @@ export default function App() {
       speedBonus: options.speedBonus
     });
     
-    if (options.onlineMode === 'matchmaking') {
-      const socket = io();
-      setMatchmakingSocket(socket);
-      setIsMatchmaking(true);
-      
-      socket.emit("join_matchmaking", {
-        timeParams: { 
-          whiteTime: options.whiteTime, 
-          whiteInc: options.whiteInc, 
-          blackTime: options.blackTime, 
-          blackInc: options.blackInc,
-          hasTimeLimits: options.hasTimeLimits,
-          speedBonus: options.speedBonus
-        }
-      });
-
-      socket.on("match_found", ({ roomId: matchedRoomId }) => {
-        setIsMultiplayer(true);
-        setRoomId(matchedRoomId);
-        setIsHost(false);
+    if (options.onlineMode === 'matchmaking' && io) {
+      try {
+        const socket = io();
+        setMatchmakingSocket(socket);
+        setIsMatchmaking(true);
+        socket.emit("join_matchmaking", { timeParams: options });
+        socket.on("match_found", ({ roomId: matchedRoomId }: { roomId: string }) => {
+          setIsMultiplayer(true);
+          setRoomId(matchedRoomId);
+          setIsHost(false);
+          setIsPlaying(true);
+          setIsMatchmaking(false);
+          socket.disconnect();
+          setMatchmakingSocket(null);
+        });
+      } catch {
+        // No server — fall back to local game
         setIsPlaying(true);
-        setIsMatchmaking(false);
-        socket.disconnect();
-        setMatchmakingSocket(null);
-      });
+      }
       return;
     }
 
-    setIsMultiplayer(options.onlineMode === 'friend');
-    const newRoomId = options.onlineMode === 'friend' ? nanoid(8) : null;
+    // Local or friend game
+    setIsMultiplayer(options.onlineMode === 'friend' && !!io);
+    const newRoomId = (options.onlineMode === 'friend' && io) ? nanoid(8) : null;
     setRoomId(newRoomId);
     setIsHost(true);
     setIsPlaying(true);
@@ -150,18 +152,13 @@ export default function App() {
     if (isPlaying) handleBack();
   };
 
-  // Desktop Sidebar NavItem with stronger active state
   const DesktopNavItem = ({ tab, icon: Icon, label, hasBadge }: { tab: typeof activeTab, icon: any, label: string, hasBadge?: boolean }) => {
     const isActive = activeTab === tab;
     return (
       <button 
         onClick={() => { 
-          if (tab === 'social') {
-            handleSocialTabClick();
-          } else {
-            setActiveTab(tab);
-            if (isPlaying) handleBack();
-          }
+          if (tab === 'social') { handleSocialTabClick(); }
+          else { setActiveTab(tab); if (isPlaying) handleBack(); }
         }}
         className={`relative flex xl:justify-start justify-center items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all w-full group
           ${isActive 
@@ -181,24 +178,16 @@ export default function App() {
     );
   };
 
-  // Mobile Bottom NavItem
   const MobileNavItem = ({ tab, icon: Icon, label, hasBadge }: { tab: typeof activeTab, icon: any, label: string, hasBadge?: boolean }) => {
     const isActive = activeTab === tab;
     return (
       <button 
         onClick={() => {
-          if (tab === 'social') {
-            handleSocialTabClick();
-          } else {
-            setActiveTab(tab);
-            if (isPlaying) handleBack();
-          }
+          if (tab === 'social') { handleSocialTabClick(); }
+          else { setActiveTab(tab); if (isPlaying) handleBack(); }
         }}
         className={`relative flex flex-col flex-none w-16 items-center gap-1 py-2 px-1 rounded-lg transition-all
-          ${isActive 
-            ? 'text-blue-600 bg-blue-50' 
-            : 'text-slate-500'
-          }`}
+          ${isActive ? 'text-blue-600 bg-blue-50' : 'text-slate-500'}`}
       >
         <div className="relative">
           <Icon size={22} />
@@ -218,14 +207,11 @@ export default function App() {
       {/* Sidebar - Desktop */}
       <nav className="hidden md:flex flex-col w-[80px] xl:w-[260px] bg-white h-full shadow-xl z-20 transition-all duration-300 border-r border-slate-100">
         <div className="p-4 pt-6 pb-8 flex items-center justify-center xl:justify-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-lg">
-            ♟
-          </div>
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-lg">♟</div>
           <span className="hidden xl:block font-extrabold text-xl text-slate-900 tracking-tight">
             <span className="text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text">Chess</span>
           </span>
         </div>
-        
         <div className="flex-1 flex flex-col gap-1 px-3 overflow-y-auto">
           <DesktopNavItem tab="play" icon={Play} label="Play" />
           <DesktopNavItem tab="puzzles" icon={Puzzle} label="Puzzles" />
@@ -235,8 +221,6 @@ export default function App() {
           <DesktopNavItem tab="shop" icon={ShoppingCart} label="Store" />
           <DesktopNavItem tab="profile" icon={User} label="Profile" />
         </div>
-
-        {/* Footer - User profile on sidebar */}
         <div className="p-3 border-t border-slate-100 hidden xl:block">
           <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-bold text-sm">
@@ -250,7 +234,7 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <main className="flex-1 overflow-y-auto pb-20 md:pb-0 h-full">
         {activeTab === 'play' && (
           activeTournamentId ? (
@@ -265,12 +249,8 @@ export default function App() {
               <div className="bg-white border border-slate-200 p-8 rounded-2xl shadow-lg max-w-sm w-full text-center">
                 <Search className="mx-auto mb-4 text-blue-600 animate-pulse" size={48} />
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Finding Opponent...</h2>
-                <p className="text-slate-600 mb-8">Waiting for another player to join matchmaking with similar settings.</p>
-                
-                <button 
-                  onClick={cancelMatchmaking}
-                  className="w-full bg-slate-50 hover:bg-slate-200 border border-slate-200 text-slate-900 font-medium py-3 px-4 rounded-2xl transition-colors flex items-center justify-center gap-2"
-                >
+                <p className="text-slate-600 mb-8">Waiting for another player to join matchmaking.</p>
+                <button onClick={cancelMatchmaking} className="w-full bg-slate-50 hover:bg-slate-200 border border-slate-200 text-slate-900 font-medium py-3 px-4 rounded-2xl transition-colors flex items-center justify-center gap-2">
                   <X size={18} /> Cancel
                 </button>
               </div>
@@ -301,7 +281,6 @@ export default function App() {
             />
           )
         )}
-
         {activeTab === 'puzzles' && <Puzzles profile={profile} onUpdateProfile={handleUpdateProfile} />}
         {activeTab === 'analysis' && <AnalysisBoard profile={profile} />}
         {activeTab === 'social' && <SocialFeed />}
