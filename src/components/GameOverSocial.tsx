@@ -141,7 +141,6 @@ export function GameOverSocial({
       >
         Back to Menu
       </button>
-    </div>
       </div>
     </div>
   );
