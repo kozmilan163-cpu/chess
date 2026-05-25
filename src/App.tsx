@@ -34,6 +34,21 @@ export default function App() {
   const [tournaments, setTournaments] = useState<{id: string, name: string, players: number, maxPlayers: number, format: string, host: string, minRating: number, maxRating: number, isPrivate: boolean}[]>([]);
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
   const [socialNotifications, setSocialNotifications] = useState(0);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    // Initialize theme from localStorage or system preference
+    const saved = localStorage.getItem('chess_theme');
+    if (saved === 'dark' || saved === 'light') {
+      setTheme(saved);
+      document.documentElement.classList.toggle('dark', saved === 'dark');
+    } else {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const initial = prefersDark ? 'dark' : 'light';
+      setTheme(initial);
+      document.documentElement.classList.toggle('dark', prefersDark);
+    }
+  }, []);
 
   useEffect(() => {
     const pathParts = window.location.pathname.split('/');
@@ -178,6 +193,13 @@ export default function App() {
     );
   };
 
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('chess_theme', newTheme);
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+  };
+
   const MobileNavItem = ({ tab, icon: Icon, label, hasBadge }: { tab: typeof activeTab, icon: any, label: string, hasBadge?: boolean }) => {
     const isActive = activeTab === tab;
     return (
@@ -203,14 +225,19 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-600 overflow-hidden font-sans">
+    <div className={'flex h-screen overflow-hidden font-sans transition-colors duration-300 ' + (theme === 'dark' ? 'dark bg-slate-900 text-slate-200' : 'bg-slate-50 text-slate-600')}>
       {/* Sidebar - Desktop */}
-      <nav className="hidden md:flex flex-col w-[80px] xl:w-[260px] bg-white h-full shadow-xl z-20 transition-all duration-300 border-r border-slate-100">
-        <div className="p-4 pt-6 pb-8 flex items-center justify-center xl:justify-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-lg">♟</div>
-          <span className="hidden xl:block font-extrabold text-xl text-slate-900 tracking-tight">
-            <span className="text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text">Chess</span>
-          </span>
+      <nav className={'hidden md:flex flex-col w-[80px] xl:w-[260px] h-full shadow-xl z-20 transition-all duration-300 ' + (theme === 'dark' ? 'bg-slate-800 border-r border-slate-700' : 'bg-white border-r border-slate-100')}>
+        <div className="p-4 pt-6 pb-8 flex items-center justify-center xl:justify-between gap-3">
+          <div className="flex items-center gap-3 justify-center xl:justify-start">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-lg">♟</div>
+            <span className="hidden xl:block font-extrabold text-xl tracking-tight" style={{color: theme === 'dark' ? '#f1f5f9' : '#0f172a'}}>
+              Chess
+            </span>
+          </div>
+          <button onClick={toggleTheme} className={'hidden xl:flex items-center justify-center w-8 h-8 rounded-lg transition-colors ' + (theme === 'dark' ? 'bg-slate-700 text-amber-400 hover:bg-slate-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')} title="Toggle dark mode">
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </div>
         <div className="flex-1 flex flex-col gap-1 px-3 overflow-y-auto">
           <DesktopNavItem tab="play" icon={Play} label="Play" />
@@ -221,14 +248,14 @@ export default function App() {
           <DesktopNavItem tab="shop" icon={ShoppingCart} label="Store" />
           <DesktopNavItem tab="profile" icon={User} label="Profile" />
         </div>
-        <div className="p-3 border-t border-slate-100 hidden xl:block">
-          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+        <div className={'p-3 border-t hidden xl:block ' + (theme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100')}>
+          <div className={'flex items-center gap-3 p-3 rounded-xl ' + (theme === 'dark' ? 'bg-slate-700' : 'bg-slate-50')}>
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-bold text-sm">
               {profile?.username?.slice(0, 1).toUpperCase() || 'P'}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-slate-900 truncate">{profile?.username || 'Player'}</div>
-              <div className="text-xs text-slate-500">Rating: {profile?.localRating || 1200}</div>
+              <div className={'text-xs font-bold truncate ' + (theme === 'dark' ? 'text-slate-100' : 'text-slate-900')}>{profile?.username || 'Player'}</div>
+              <div className={'text-xs ' + (theme === 'dark' ? 'text-slate-400' : 'text-slate-500')}>Rating: {profile?.localRating || 1200}</div>
             </div>
           </div>
         </div>
@@ -290,7 +317,7 @@ export default function App() {
       </main>
 
       {/* Bottom Nav - Mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around items-center z-50 safe-area-bottom h-20">
+      <nav className={'md:hidden fixed bottom-0 left-0 right-0 flex justify-around items-center z-50 safe-area-bottom h-20 ' + (theme === 'dark' ? 'bg-slate-800 border-t border-slate-700' : 'bg-white border-t border-slate-200')}>
         <MobileNavItem tab="play" icon={Play} label="Play" />
         <MobileNavItem tab="puzzles" icon={Puzzle} label="Puzzles" />
         <MobileNavItem tab="analysis" icon={LineChart} label="Analysis" />
@@ -302,3 +329,4 @@ export default function App() {
     </div>
   );
 }
+
