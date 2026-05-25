@@ -112,16 +112,6 @@ export function Profile({ profile, onUpdateProfile }: ProfileProps) {
     }, 500);
   };
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      onUpdateProfile({ ...profile, avatar: reader.result as string });
-      setShowAvatarUpload(false);
-    };
-    reader.readAsDataURL(file);
-  };
 
   const handleVerifyChessCom = async () => {
     setLoading(true);
@@ -337,10 +327,10 @@ export function Profile({ profile, onUpdateProfile }: ProfileProps) {
                 </div>
               </div>
             </div>
+            </div>
           )}
 
           {/* History Tab */}
-          </div>
           {activeTab === 'history' && (
             <div className="space-y-2">
               {(!profile.history || profile.history.length === 0) ? (
