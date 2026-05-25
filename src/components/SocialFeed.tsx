@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Chessboard } from 'react-chessboard';
-import { Heart, MessageSquare, Share2, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Heart, MessageSquare, Share2, ChevronLeft, ChevronRight, Clock, UserPlus, UserCheck } from 'lucide-react';
 import { Chess } from 'chess.js';
 
 interface Post {
@@ -35,6 +35,15 @@ export function SocialFeed() {
   const [followingPlayers, setFollowingPlayers] = useState<string[]>([]);
 
   const currentUsername = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('chess_profile') || '{}').username || 'Player' : 'Player';
+
+  const toggleFollow = (playerUsername: string) => {
+    let newFollowing = followingPlayers.includes(playerUsername)
+      ? followingPlayers.filter(u => u !== playerUsername)
+      : [...followingPlayers, playerUsername];
+    
+    setFollowingPlayers(newFollowing);
+    localStorage.setItem('chess_following', JSON.stringify(newFollowing));
+  };
 
   useEffect(() => {
     fetchFeed();
@@ -164,6 +173,8 @@ export function SocialFeed() {
                 commentInputs={commentInputs} 
                 setCommentInputs={setCommentInputs} 
                 currentUsername={currentUsername}
+                isFollowing={followingPlayers.includes(post.author)}
+                onToggleFollow={() => toggleFollow(post.author)}
               />
             ))}
           </div>
@@ -173,7 +184,7 @@ export function SocialFeed() {
   );
 }
 
-function SocialPostCard({ post, likedPosts, handleLike, handleComment, commentInputs, setCommentInputs, currentUsername }: any) {
+function SocialPostCard({ post, likedPosts, handleLike, handleComment, commentInputs, setCommentInputs, currentUsername, isFollowing, onToggleFollow }: any) {
   const [moveIndex, setMoveIndex] = useState(0);
   const [history, setHistory] = useState<any[]>([]);
   const [showLikeAnimation, setShowLikeAnimation] = useState(false);
@@ -232,7 +243,7 @@ function SocialPostCard({ post, likedPosts, handleLike, handleComment, commentIn
     <div className="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-300 transition-all hover:shadow-xl">
       {/* Header */}
       <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1">
           <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${getAvatarColor(post.author)} flex items-center justify-center text-white font-bold text-lg shadow-md`}>
             {post.author.charAt(0).toUpperCase()}
           </div>
@@ -244,6 +255,26 @@ function SocialPostCard({ post, likedPosts, handleLike, handleComment, commentIn
             </div>
           </div>
         </div>
+        {post.author !== currentUsername && (
+          <button 
+            onClick={onToggleFollow}
+            className={`ml-2 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              isFollowing 
+                ? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600' 
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {isFollowing ? (
+              <>
+                <UserCheck size={12} /> Following
+              </>
+            ) : (
+              <>
+                <UserPlus size={12} /> Follow
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Caption */}
