@@ -11,14 +11,8 @@ import { Shop } from './components/Shop';
 import { StudioWorkspace } from './components/StudioWorkspace';
 import { TournamentManager } from './components/TournamentManager';
 
-// Socket.io is optional — only used when a real server is available
-let io: any = null;
-try {
-  // @ts-ignore
-  io = (await import('socket.io-client')).default;
-} catch {
-  // running as static build — multiplayer disabled
-}
+// Multiplayer disabled in static build — no socket.io
+const io: any = null;
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'play' | 'social' | 'profile' | 'shop' | 'studio' | 'puzzles' | 'analysis'>('play');
