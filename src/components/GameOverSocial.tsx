@@ -26,6 +26,8 @@ export function GameOverSocial({
   const [shareComment, setShareComment] = useState('');
   const [showShareForm, setShowShareForm] = useState(false);
   const [friendRequested, setFriendRequested] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
 
   const resultConfig = {
     win: { emoji: '🏆', title: 'Victory!', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-200 dark:border-emerald-800' },
@@ -43,7 +45,13 @@ export function GameOverSocial({
   };
 
   return (
-    <div className={`rounded-2xl border ${config.border} ${config.bg} p-6 space-y-4`}>
+    <div>
+      {shareSuccess && (
+        <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2 text-green-700 dark:text-green-400 font-semibold animate-in fade-in slide-in-from-top">
+          <span>✅</span> Game shared to feed!
+        </div>
+      )}
+      <div className={`rounded-2xl border ${config.border} ${config.bg} p-6 space-y-4`}>
       {/* Result Header */}
       <div className="text-center">
         <div className="text-4xl mb-2">{config.emoji}</div>
@@ -134,5 +142,8 @@ export function GameOverSocial({
         Back to Menu
       </button>
     </div>
+      </div>
+    </div>
   );
 }
+
