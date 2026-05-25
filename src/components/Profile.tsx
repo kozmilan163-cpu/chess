@@ -63,6 +63,22 @@ export function Profile({ profile, onUpdateProfile }: ProfileProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>('stats');
   const [friendFilter, setFriendFilter] = useState<'all' | 'online' | 'requests'>('all');
 
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      onUpdateProfile({
+        ...profile,
+        avatar: base64
+      });
+      setShowAvatarUpload(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
   useEffect(() => {
     if (profile) {
       setUsername(profile.username);
@@ -234,6 +250,47 @@ export function Profile({ profile, onUpdateProfile }: ProfileProps) {
         <div className="p-4">
           {/* Stats Tab */}
           {activeTab === 'stats' && (
+          <div className="space-y-6">
+            {/* Avatar Section */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
+              <div className="flex flex-col items-center gap-4">
+                {profile.avatar ? (
+                  <img src={profile.avatar} alt="avatar" className="w-32 h-32 rounded-full object-cover shadow-lg border-4 border-blue-200 dark:border-blue-800" />
+                ) : (
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-white text-6xl font-bold shadow-lg">
+                    {profile.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <button 
+                  onClick={() => setShowAvatarUpload(!showAvatarUpload)}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-colors flex items-center gap-2"
+                >
+                  <Upload size={16} />
+                  Change Avatar
+                </button>
+                {showAvatarUpload && (
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleAvatarUpload}
+                    className="mt-2"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {getStats().map(stat => (
+                <div key={stat.label} className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 text-center">
+                  <div className="text-3xl mb-2">{stat.icon}</div>
+                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stat.value.toLocaleString()}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-semibold">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Previous stats content */}
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 text-center">
@@ -283,6 +340,7 @@ export function Profile({ profile, onUpdateProfile }: ProfileProps) {
           )}
 
           {/* History Tab */}
+          </div>
           {activeTab === 'history' && (
             <div className="space-y-2">
               {(!profile.history || profile.history.length === 0) ? (
@@ -449,3 +507,4 @@ export function Profile({ profile, onUpdateProfile }: ProfileProps) {
     </div>
   );
 }
+
