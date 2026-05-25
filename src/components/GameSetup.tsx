@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FriendInvite } from './FriendInvite';
 import { Play, Globe, Users, QrCode, ArrowLeft, Zap, Orbit, Clock, Flame, Settings } from 'lucide-react';
 import { UserProfile } from './Profile';
 
@@ -118,7 +119,31 @@ export function GameSetup({ onStart, onJoin, profile, tournaments = [], onCreate
 
   const RenderPreset = ({ label, m, i, mode, icon: Icon }: { label: string, m: number, i: number, mode: TimeMode, icon: any }) => {
     const isSelected = activeMode === mode && minutes === m && increment === i;
+      if (showFriendInvite) {
     return (
+      <FriendInvite
+        profile={profile}
+        whiteTime={whiteMinutes * 60}
+        whiteIncrement={whiteIncrement}
+        blackTime={blackMinutes * 60}
+        blackIncrement={blackIncrement}
+        onGameStart={(roomId, isHost) => {
+          onStart({
+            whiteTime: whiteMinutes * 60,
+            whiteInc: whiteIncrement,
+            blackTime: blackMinutes * 60,
+            blackInc: blackIncrement,
+            onlineMode: 'friend',
+            hasTimeLimits: true,
+            speedBonus: false,
+          });
+        }}
+        onCancel={() => setShowFriendInvite(false)}
+      />
+    );
+  }
+
+  return (
       <button
         onClick={() => {
           setPreset(m, i, mode);
