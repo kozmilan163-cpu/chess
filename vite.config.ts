@@ -4,6 +4,7 @@ import path from "path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  base: "./",   // ← relative paths so tiiny.host / any static host works
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
