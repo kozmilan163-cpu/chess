@@ -10,10 +10,13 @@ import { AnalysisBoard } from './components/AnalysisBoard';
 import { Shop } from './components/Shop';
 import { StudioWorkspace } from './components/StudioWorkspace';
 import { TournamentManager } from './components/TournamentManager';
+import MultiplayerLobby from './components/MultiplayerLobby';
+import MultiplayerGameView from './components/MultiplayerGameView';
+import { GameRoom } from './utils/multiplayerRealtime';
 
 const io: any = null;
 
-type Tab = 'play' | 'social' | 'profile' | 'shop' | 'studio' | 'puzzles' | 'analysis';
+type Tab = 'play' | 'social' | 'profile' | 'shop' | 'studio' | 'puzzles' | 'analysis' | 'multiplayer';
 
 const NAV_ITEMS: { tab: Tab; icon: any; label: string; emoji: string }[] = [
   { tab: 'play',     icon: Swords,    label: 'Play',     emoji: '⚔️' },
@@ -38,6 +41,8 @@ export default function App() {
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
   const [socialNotifications, setSocialNotifications] = useState(0);
+  const [multiplayerRoom, setMultiplayerRoom] = useState<GameRoom | null>(null);
+  const [inMultiplayerGame, setInMultiplayerGame] = useState(false);
 
   useEffect(() => {
     // Always dark mode
@@ -75,167 +80,90 @@ export default function App() {
       } catch { setIsPlaying(true); }
       return;
     }
-    setIsMultiplayer(options.onlineMode === 'friend' && !!io);
-    const newRoomId = (options.onlineMode === 'friend' && io) ? nanoid(8) : null;
-    setRoomId(newRoomId); setIsHost(true); setIsPlaying(true);
+    
+    // Friend mode — use new multiplayer system
+    if (options.onlineMode === 'friend') {
+      setActiveTab('multiplayer');
+      return;
+    }
+    
+    setIsMultiplayer(false);
+    setRoomId(null); setIsHost(true); setIsPlaying(true);
   };
 
-  const cancelMatchmaking = () => {
-    if (matchmakingSocket) { matchmakingSocket.emit('leave_matchmaking'); matchmakingSocket.disconnect(); setMatchmakingSocket(null); }
-    setIsMatchmaking(false);
+  const handleMultiplayerGameStart = (room: GameRoom) => {
+    setMultiplayerRoom(room);
+    setInMultiplayerGame(true);
   };
 
-  const handleJoin = (joinRoomId: string) => {
-    setIsMultiplayer(true); setRoomId(joinRoomId); setIsHost(false);
-    setIsPlaying(true); window.history.pushState({}, '', '/join/' + joinRoomId);
+  const handleMultiplayerGameOver = (result: string) => {
+    // Handle game over — could save to social feed, update stats, etc.
+    console.log('Game over:', result);
+    setInMultiplayerGame(false);
   };
 
-  const handleCreateTournament = (data: any) => {
-    const t = { id: nanoid(6).toUpperCase(), name: data.name, players: 1, maxPlayers: data.maxPlayers, format: data.format, host: profile?.username || 'Host', minRating: data.minRating, maxRating: data.maxRating, isPrivate: data.isPrivate };
-    setTournaments(prev => [...prev, t]);
-    setActiveTournamentId(t.id);
-  };
-
-  const handleJoinTournament = (tId: string) => setActiveTournamentId(tId);
-
-  const handleBack = () => {
-    setIsPlaying(false); setIsMultiplayer(false); setRoomId(null);
-    window.history.pushState({}, '', '/');
-  };
-
-  const handleSocialTab = () => {
-    setActiveTab('social'); setSocialNotifications(0);
-    localStorage.setItem('chess_social_notifs', '0');
-    if (isPlaying) handleBack();
-  };
-
-  const goToTab = (tab: Tab) => {
-    if (tab === 'social') { handleSocialTab(); return; }
-    setActiveTab(tab);
-    if (isPlaying) handleBack();
+  const handleLeaveMultiplayer = () => {
+    setMultiplayerRoom(null);
+    setInMultiplayerGame(false);
+    setActiveTab('play');
   };
 
   return (
-    <div style={{ background: 'var(--bg-primary)', minHeight: '100vh' }} className="flex h-screen overflow-hidden">
-
-      {/* ── Desktop Sidebar ───────────────── */}
-      <nav className="hidden md:flex flex-col h-full z-20"
-        style={{ width: 64, background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)', flexShrink: 0 }}>
-        
-        {/* Logo */}
-        <div className="flex items-center justify-center" style={{ height: 64, borderBottom: '1px solid var(--border)' }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'linear-gradient(135deg,#6366f1,#818cf8)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 18, boxShadow: '0 4px 12px rgba(99,102,241,.4)'
-          }}>♟</div>
-        </div>
-
-        {/* Nav items */}
-        <div className="flex-1 flex flex-col items-center gap-1 py-3">
-          {NAV_ITEMS.map(({ tab, icon: Icon, label }) => {
-            const isActive = activeTab === tab;
-            const hasBadge = tab === 'social' && socialNotifications > 0;
-            return (
-              <button key={tab} onClick={() => goToTab(tab)} title={label}
-                style={{
-                  width: 44, height: 44, borderRadius: 12,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', transition: 'all .2s', border: 'none',
-                  background: isActive ? 'rgba(99,102,241,.18)' : 'transparent',
-                  color: isActive ? 'var(--indigo-bright)' : 'var(--text-3)',
-                  position: 'relative',
-                }}>
-                {isActive && (
-                  <div style={{ position: 'absolute', left: -10, top: '50%', transform: 'translateY(-50%)', width: 3, height: 18, background: 'var(--indigo-bright)', borderRadius: '0 3px 3px 0' }} />
-                )}
-                <Icon size={18} />
-                {hasBadge && (
-                  <span style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: '50%', background: '#f43f5e' }} />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Profile mini */}
-        <div style={{ padding: '12px 10px', borderTop: '1px solid var(--border)' }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12, cursor: 'pointer',
-            background: 'linear-gradient(135deg,#f5c842,#e8b800)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 800, fontSize: 16, color: '#1a1200',
-          }} onClick={() => goToTab('profile')}>
-            {profile?.username?.slice(0,1).toUpperCase() || 'P'}
-          </div>
-        </div>
-      </nav>
-
-      {/* ── Main Content ──────────────────── */}
-      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 72, background: 'var(--bg-primary)' }}>
-        {activeTab === 'play' && (
-          activeTournamentId ? (
-            <TournamentManager
-              tournamentId={activeTournamentId}
-              tournament={tournaments.find(t => t.id === activeTournamentId) || { id:'', name:'', format:'', maxPlayers:0, minRating:0, maxRating:0, isPrivate:false, host:'' }}
-              profile={profile} onLeave={() => setActiveTournamentId(null)}
-            />
-          ) : isMatchmaking ? (
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', padding:24 }}>
-              <div className="glass-elevated" style={{ maxWidth:360, width:'100%', textAlign:'center', padding:40 }}>
-                <div style={{ fontSize:48, marginBottom:16 }}>🔍</div>
-                <h2 style={{ fontSize:22, fontWeight:800, marginBottom:8, color:'var(--text-1)' }}>Finding Opponent...</h2>
-                <p style={{ color:'var(--text-2)', marginBottom:32 }}>Waiting for another player to join matchmaking.</p>
-                <button onClick={cancelMatchmaking} className="btn btn-ghost" style={{ width:'100%' }}>
-                  <X size={16} /> Cancel
-                </button>
-              </div>
+    <div className="h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white overflow-hidden">
+      {/* Main Content */}
+      <div className="h-full overflow-y-auto">
+        {activeTab === 'play' && !isPlaying && <GameSetup onStart={handleStart} profile={profile} />}
+        {activeTab === 'play' && isPlaying && !isMatchmaking && <ChessGame timeParams={timeParams} profile={profile} onUpdateProfile={handleUpdateProfile} roomId={roomId} isMultiplayer={isMultiplayer} isHost={isHost} />}
+        {activeTab === 'play' && isMatchmaking && (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin mb-4 w-12 h-12 rounded-full border-4 border-slate-700 border-t-amber-500 mx-auto"></div>
+              <p className="text-xl">Finding opponent...</p>
             </div>
-          ) : isPlaying ? (
-            <ChessGame
-              initialWhiteTime={timeParams.whiteTime} whiteIncrement={timeParams.whiteInc}
-              initialBlackTime={timeParams.blackTime} blackIncrement={timeParams.blackInc}
-              hasTimeLimits={timeParams.hasTimeLimits} speedBonus={timeParams.speedBonus}
-              isMultiplayer={isMultiplayer} roomId={roomId} isHost={isHost}
-              onBack={handleBack} profile={profile} onUpdateProfile={handleUpdateProfile}
-            />
-          ) : (
-            <GameSetup
-              onStart={handleStart} onJoin={handleJoin} profile={profile}
-              tournaments={tournaments} onCreateTournament={handleCreateTournament}
-              onJoinTournament={handleJoinTournament}
-            />
-          )
+          </div>
         )}
-        {activeTab === 'puzzles'  && <Puzzles profile={profile} onUpdateProfile={handleUpdateProfile} />}
-        {activeTab === 'analysis' && <AnalysisBoard profile={profile} />}
-        {activeTab === 'social'   && <SocialFeed />}
-        {activeTab === 'shop'     && <Shop profile={profile} onUpdateProfile={handleUpdateProfile} onNavigateToTab={setActiveTab} />}
-        {activeTab === 'studio'   && <StudioWorkspace profile={profile} onUpdateProfile={handleUpdateProfile} />}
-        {activeTab === 'profile'  && <Profile profile={profile} onUpdateProfile={handleUpdateProfile} />}
-      </main>
 
-      {/* ── Mobile Bottom Nav ─────────────── */}
-      <nav className="md:hidden mobile-nav">
-        {NAV_ITEMS.map(({ tab, icon: Icon, label }) => {
-          const isActive = activeTab === tab;
-          const hasBadge = tab === 'social' && socialNotifications > 0;
-          return (
-            <button key={tab} onClick={() => goToTab(tab)}
-              className={`mobile-nav-item${isActive ? ' active' : ''}`}
-              style={{ background:'transparent', border:'none' }}>
-              <div style={{ position:'relative' }}>
-                <Icon size={20} />
-                {hasBadge && (
-                  <span style={{ position:'absolute', top:-2, right:-4, width:7, height:7, borderRadius:'50%', background:'#f43f5e' }} />
-                )}
-              </div>
-              <span>{label}</span>
-            </button>
-          );
-        })}
-      </nav>
+        {activeTab === 'multiplayer' && !inMultiplayerGame && profile && (
+          <MultiplayerLobby
+            playerName={profile.username}
+            onJoinGame={handleMultiplayerGameStart}
+            onBack={() => setActiveTab('play')}
+          />
+        )}
+
+        {activeTab === 'multiplayer' && inMultiplayerGame && multiplayerRoom && profile && (
+          <MultiplayerGameView
+            room={multiplayerRoom}
+            playerName={profile.username}
+            onGameOver={handleMultiplayerGameOver}
+            onLeave={handleLeaveMultiplayer}
+          />
+        )}
+
+        {activeTab === 'puzzles' && <Puzzles profile={profile} onUpdateProfile={handleUpdateProfile} />}
+        {activeTab === 'analysis' && <AnalysisBoard />}
+        {activeTab === 'social' && <SocialFeed profile={profile} onUpdateProfile={handleUpdateProfile} notificationCount={socialNotifications} />}
+        {activeTab === 'shop' && <Shop profile={profile} onUpdateProfile={handleUpdateProfile} />}
+        {activeTab === 'studio' && <StudioWorkspace />}
+        {activeTab === 'profile' && profile && <Profile profile={profile} onUpdateProfile={handleUpdateProfile} />}
+      </div>
+
+      {/* Navigation Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-4 py-2 flex justify-between overflow-x-auto">
+        {NAV_ITEMS.map((item) => (
+          <button
+            key={item.tab}
+            onClick={() => { setActiveTab(item.tab); setIsPlaying(false); }}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition ${ activeTab === item.tab ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            <span className="text-lg">{item.emoji}</span>
+            <span className="text-xs hidden sm:block">{item.label}</span>
+            {item.tab === 'social' && socialNotifications > 0 && (
+              <div className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{socialNotifications}</div>
+            )}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
