@@ -4,7 +4,7 @@ import { ChessGame } from './components/ChessGame';
 import { Profile, UserProfile } from './components/Profile';
 import { SocialFeed } from './components/SocialFeed';
 import { nanoid } from 'nanoid';
-import { User, Share2, Play, Search, X, ShoppingCart, Palette, Puzzle, LineChart, Trophy, Swords } from 'lucide-react';
+import { User, Share2, Play, Search, X, ShoppingCart, Palette, Puzzle, LineChart, Trophy, Swords, BookOpen } from 'lucide-react';
 import { Puzzles } from './components/Puzzles';
 import { AnalysisBoard } from './components/AnalysisBoard';
 import { Shop } from './components/Shop';
@@ -14,15 +14,17 @@ import { LeaderboardsEnhanced } from './components/LeaderboardsEnhanced';
 import MultiplayerLobby from './components/MultiplayerLobby';
 import MultiplayerGameView from './components/MultiplayerGameView';
 import { GameRoom } from './utils/multiplayerRealtime';
+import { GameLibrary } from './components/GameLibrary';
 
 const io: any = null;
 
-type Tab = 'play' | 'social' | 'profile' | 'shop' | 'studio' | 'puzzles' | 'analysis' | 'multiplayer' | 'leaderboards';
+type Tab = 'play' | 'library' | 'social' | 'profile' | 'shop' | 'studio' | 'puzzles' | 'analysis' | 'multiplayer' | 'leaderboards';
 
 const NAV_ITEMS: { tab: Tab; icon: any; label: string; emoji: string }[] = [
   { tab: 'play',     icon: Swords,    label: 'Play',     emoji: '⚔️' },
   { tab: 'puzzles',  icon: Puzzle,    label: 'Puzzles',  emoji: '🧩' },
   { tab: 'analysis', icon: LineChart, label: 'Analysis', emoji: '📊' },
+  { tab: 'library',  icon: BookOpen,  label: 'Library',  emoji: '📚' },
   { tab: 'social',   icon: Share2,    label: 'Social',   emoji: '🌐' },
   { tab: 'leaderboards', icon: Trophy, label: 'Rankings', emoji: '🏆' },
   { tab: 'shop',     icon: ShoppingCart, label: 'Store', emoji: '🛍️' },
@@ -144,6 +146,7 @@ export default function App() {
 
         {activeTab === 'puzzles' && <Puzzles profile={profile} onUpdateProfile={handleUpdateProfile} />}
         {activeTab === 'analysis' && <AnalysisBoard />}
+        {activeTab === 'library' && profile && <GameLibrary currentUsername={profile.username} />}
         {activeTab === 'social' && <SocialFeed profile={profile} onUpdateProfile={handleUpdateProfile} notificationCount={socialNotifications} />}
         {activeTab === 'shop' && <Shop profile={profile} onUpdateProfile={handleUpdateProfile} />}
         {activeTab === 'studio' && <StudioWorkspace />}
