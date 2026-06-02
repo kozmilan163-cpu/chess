@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Heart, MessageSquare, Share2, ChevronLeft, ChevronRight, Clock, UserPlus, UserCheck } from 'lucide-react';
+import { RankBadge } from './RankBadge';
 import { Chess } from 'chess.js';
 
 interface Post {
@@ -9,6 +10,7 @@ interface Post {
   fen?: string;
   author: string;
   authorAvatar?: string;
+  authorRating?: number;
   comment: string;
   likes: number;
   timestamp: number;

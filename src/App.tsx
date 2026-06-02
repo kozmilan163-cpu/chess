@@ -10,19 +10,21 @@ import { AnalysisBoard } from './components/AnalysisBoard';
 import { Shop } from './components/Shop';
 import { StudioWorkspace } from './components/StudioWorkspace';
 import { TournamentManager } from './components/TournamentManager';
+import { LeaderboardsEnhanced } from './components/LeaderboardsEnhanced';
 import MultiplayerLobby from './components/MultiplayerLobby';
 import MultiplayerGameView from './components/MultiplayerGameView';
 import { GameRoom } from './utils/multiplayerRealtime';
 
 const io: any = null;
 
-type Tab = 'play' | 'social' | 'profile' | 'shop' | 'studio' | 'puzzles' | 'analysis' | 'multiplayer';
+type Tab = 'play' | 'social' | 'profile' | 'shop' | 'studio' | 'puzzles' | 'analysis' | 'multiplayer' | 'leaderboards';
 
 const NAV_ITEMS: { tab: Tab; icon: any; label: string; emoji: string }[] = [
   { tab: 'play',     icon: Swords,    label: 'Play',     emoji: '⚔️' },
   { tab: 'puzzles',  icon: Puzzle,    label: 'Puzzles',  emoji: '🧩' },
   { tab: 'analysis', icon: LineChart, label: 'Analysis', emoji: '📊' },
   { tab: 'social',   icon: Share2,    label: 'Social',   emoji: '🌐' },
+  { tab: 'leaderboards', icon: Trophy, label: 'Rankings', emoji: '🏆' },
   { tab: 'shop',     icon: ShoppingCart, label: 'Store', emoji: '🛍️' },
   { tab: 'studio',   icon: Palette,   label: 'Studio',   emoji: '🎨' },
   { tab: 'profile',  icon: User,      label: 'Profile',  emoji: '👤' },
@@ -145,6 +147,7 @@ export default function App() {
         {activeTab === 'social' && <SocialFeed profile={profile} onUpdateProfile={handleUpdateProfile} notificationCount={socialNotifications} />}
         {activeTab === 'shop' && <Shop profile={profile} onUpdateProfile={handleUpdateProfile} />}
         {activeTab === 'studio' && <StudioWorkspace />}
+        {activeTab === 'leaderboards' && profile && <LeaderboardsEnhanced currentUsername={profile.username} currentRating={profile.localRating} currentPlayerId={profile.username} />}
         {activeTab === 'profile' && profile && <Profile profile={profile} onUpdateProfile={handleUpdateProfile} />}
       </div>
 

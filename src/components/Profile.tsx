@@ -178,7 +178,10 @@ export function Profile({ profile, onUpdateProfile }: ProfileProps) {
                 <p className="text-slate-500 dark:text-slate-400 text-xs">Games</p>
               </div>
               <div className="text-center">
-                <p className="font-bold text-slate-900 dark:text-white">{profile.localRating}</p>
+                <div className="flex items-center gap-2">
+                  <RankBadge rating={profile.localRating} size="md" />
+                  <p className="font-bold text-slate-900 dark:text-white">{profile.localRating}</p>
+                </div>
                 <p className="text-slate-500 dark:text-slate-400 text-xs">Rating</p>
               </div>
               <div className="text-center">
