@@ -4,7 +4,7 @@ import { ChessGame } from './components/ChessGame';
 import { Profile, UserProfile } from './components/Profile';
 import { SocialFeed } from './components/SocialFeed';
 import { nanoid } from 'nanoid';
-import { User, Share2, Play, Search, X, ShoppingCart, Palette, Puzzle, LineChart, Trophy, Swords, BookOpen } from 'lucide-react';
+import { User, Share2, Play, Search, X, ShoppingCart, Palette, Puzzle, LineChart, Trophy, Swords, BookOpen, BarChart3 } from 'lucide-react';
 import { Puzzles } from './components/Puzzles';
 import { AnalysisBoard } from './components/AnalysisBoard';
 import { Shop } from './components/Shop';
@@ -15,10 +15,11 @@ import MultiplayerLobby from './components/MultiplayerLobby';
 import MultiplayerGameView from './components/MultiplayerGameView';
 import { GameRoom } from './utils/multiplayerRealtime';
 import { GameLibrary } from './components/GameLibrary';
+import { PlayerStats } from './components/PlayerStats';
 
 const io: any = null;
 
-type Tab = 'play' | 'library' | 'social' | 'profile' | 'shop' | 'studio' | 'puzzles' | 'analysis' | 'multiplayer' | 'leaderboards';
+type Tab = 'play' | 'library' | 'social' | 'profile' | 'shop' | 'studio' | 'puzzles' | 'analysis' | 'multiplayer' | 'leaderboards' | 'stats';
 
 const NAV_ITEMS: { tab: Tab; icon: any; label: string; emoji: string }[] = [
   { tab: 'play',     icon: Swords,    label: 'Play',     emoji: '⚔️' },
@@ -30,6 +31,7 @@ const NAV_ITEMS: { tab: Tab; icon: any; label: string; emoji: string }[] = [
   { tab: 'shop',     icon: ShoppingCart, label: 'Store', emoji: '🛍️' },
   { tab: 'studio',   icon: Palette,   label: 'Studio',   emoji: '🎨' },
   { tab: 'profile',  icon: User,      label: 'Profile',  emoji: '👤' },
+  { tab: 'stats',    icon: BarChart3,  label: 'Stats',    emoji: '📈' },
 ];
 
 export default function App() {
@@ -152,6 +154,7 @@ export default function App() {
         {activeTab === 'studio' && <StudioWorkspace />}
         {activeTab === 'leaderboards' && profile && <LeaderboardsEnhanced currentUsername={profile.username} currentRating={profile.localRating} currentPlayerId={profile.username} />}
         {activeTab === 'profile' && profile && <Profile profile={profile} onUpdateProfile={handleUpdateProfile} />}
+        {activeTab === 'stats' && profile && <PlayerStats profile={profile} />}
       </div>
 
       {/* Navigation Bar */}
